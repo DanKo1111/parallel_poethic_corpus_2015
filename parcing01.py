@@ -2,67 +2,76 @@
 import codecs
 import re
 import os
+import json
 
-class data: #Данные о слове
-    def __init__(self, word, wordform, grammar_options, positions):
-        self.word = word #Слово
-        self.wordform = wordform #Словоформа
-        self.grammar_options = options #Массив (ну или какая-нибудь другая форма хранения данных, если я ее придумаю) грамматических опций слова
-        self.positions = positions #Массив номеров слов с одинаковыми word, wordform, options
+data = {} #словарь обратных индексов грамматических характеристик
+words = {} #словарь обратных индексов точных форм
+wordforms = {} #словарь обратных индексов словоформ
 
-class stanza: #Данные о строфе
-    def __init__(self, verse_number, stanza_number, stanza_text, left_index, right_index):
-        self.verse_number = verse_number #Номер стиха
-        self.stanza_number = stanza_number #Номер строфы
-        self.stanza_text = stanza_text #массив элементов с типом data
-        self.right_index = right_index #порядковый номер первого слова строфы
-        self.left_index = left_index #порядковый номер последнего слова строфы
-    def show_strophe():
-        return self.stanza_text
-    def show_verse_number():
-        return verse_number
-    def show_stanza_number():
-        return stanza_number
-    def show_range():
-        return [left_index, right_index]
-
-class corpora(data): #А тут должен быть корпус. С обработкой всякого. НО... его тут пока нет
-    def __init__(self, texts):
-        self.texts = texts
-    def in_words(request): #Тут должен быть запрос в корпус. По всем параметрам. 
-        for i in texts:
-            if request == i.word:
-                return i #
-    def in_wordforms(request):
-            pass
-    #...
-
-def mystem_parcing(input_path, output_path, mystem_dir="C:\\daniil\\mystem.exe", options="-n -e cp1251 -i"):
+def mystem_parcing(input_path, output_path, mystem_dir="C:\\daniil\\mystem.exe", options="-n -d -e cp1251 -i --eng-gr"): #Парсинг текстов
     os.system(mystem_dir + " " + options + " " + input_path + " " + output_path) #c:\\daniil\\text.txt c:\\daniil\\res2.txt")
+#mystem_parcing(u"c:\\daniil\\text1.txt", u"c:\\daniil\\parced_ru1.txt")
 
-def strophes_index(): 
-    pass
 
-##А дальше почти ничего не изменилось
+def def_stats(stats, index): #Выделение грамматических характеристик. Проблема омонимии решена майстемовскими средствами, но, к сожалению, не на все 100%
+    gram_char = re.compile(u'[a-z0-9]*', flags = re.U)
+    omonims = gram_char.findall(stats)
+    for i in omonims:
+        if i != u'':
+            if i in data:
+                if index not in data[i]:
+                    data[i].append(index)
+            else:
+                data.update({i:[index]})
 
-def create_data(parced_path):
-    strophe_number = re.compile(u'<\d:\d>', flags = re.U) #Поиск номера стиха в номере файла
+def def_words(word, wordform, index): #выделение точной и словоформы
+    if word in words:
+        if index not in words[word]:
+            words[word].append(index)
+    else:
+        words.update({word:[index]})
+
+    if wordform in wordforms:
+        if index not in wordforms[wordform]:
+            wordforms[wordform].append(index)
+    else:
+        wordforms.update({wordform:[index]})
+
+
+
+def create_data(parced_path): #создание словарей обратных индексов
     parcer_info = re.compile(u'{.*}', flags = re.U)
+    word_info = re.compile(u'[а-яА-Я]*')
+    
     parced_file = codecs.open(parced_path, 'r', 'cp1251') #"C:\\daniil\\res.txt"
-    texts = []
     index = 0
-    verse = u""
-    stanza = u""
     for i in parced_file:
-        new_word = data()
-        if strophe_number.findall(i):
-            new_word
+        stats = parcer_info.findall(i)[0]
+        def_stats(stats, index)
+
+        words = word_info.findall(i)
+        word = words[0].lower()
+        wordform = words[2]
+        def_words(word, wordform, index)   
+        
+        index += 1
+        
+    parced_file.close()
+   
 
 
-        word = parcer_info.sub('', i).strip()
-        parameters = parcer_info.findall(i)[0] #Вообще, вот тут параметры надо как-то разбирать из строки в какой-то формальный вид. Но я еще не придумал, как. 
-        data.append([word, parameters])
-    for i in data:
-        for j in i:
-            print j
-        print "---------------------------"
+
+create_data(u"C:\\daniil\\parced_ru1.txt") #на вход подается файл, полученный из майстема
+
+##Пока что создается три файла json: грамм. характеристики, точные формы, словоформы.
+a = codecs.open(u"c:\\daniil\\result_data.json", u"w", u"cp1251")
+json.dump(data, a, indent = 1)
+a.close()
+
+a = codecs.open(u"c:\\daniil\\result_words.json", u"w", u"utf-8")
+json.dump(words, a, indent = 1)
+a.close()
+
+a = codecs.open(u"c:\\daniil\\result_wordforms.json", "w", "cp1251")
+json.dump(wordforms, a, indent = 1)
+a.close()
